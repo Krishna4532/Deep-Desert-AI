@@ -1,0 +1,137 @@
+# ============================================================
+#  Offroad Autonomy — Semantic Segmentation Config
+# ============================================================
+
+project:
+  name: "offroad_autonomy"
+  experiment: "deeplabv3plus_resnet50_baseline"
+  seed: 42
+
+# ----------------------------------------------------------
+# Dataset
+# ----------------------------------------------------------
+data:
+  root: "data/processed"
+  splits_dir: "data/splits"
+  image_dir: "images"
+  mask_dir:  "masks"
+  image_ext: ".png"
+  mask_ext:  ".png"
+  num_workers: 0          # 0 = no multiprocessing (safe on Windows CPU)
+  pin_memory: false       # disabled — no GPU
+
+  # 9 semantic classes
+  classes:
+    - name: "Sky"
+      id: 0
+      color: [70, 130, 180]       # steel blue
+    - name: "Landscape"
+      id: 1
+      color: [124, 179, 66]       # olive green
+    - name: "Rocks"
+      id: 2
+      color: [112, 128, 144]      # slate grey
+    - name: "Dry Grass"
+      id: 3
+      color: [210, 180, 140]      # tan
+    - name: "Trees"
+      id: 4
+      color: [34, 85, 34]         # dark green
+    - name: "Lush Bushes"
+      id: 5
+      color: [0, 168, 107]        # jade
+    - name: "Logs"
+      id: 6
+      color: [101, 67, 33]        # brown
+    - name: "Flowers"
+      id: 7
+      color: [255, 105, 180]      # hot pink
+    - name: "Ground Clutter"
+      id: 8
+      color: [169, 169, 169]      # dark grey
+
+  num_classes: 9
+  ignore_index: 255
+
+# ----------------------------------------------------------
+# Augmentation
+# ----------------------------------------------------------
+augmentation:
+  train:
+    resize: [256, 256]
+    random_crop: [224, 224]
+    horizontal_flip: true
+    vertical_flip: false
+    color_jitter:
+      brightness: 0.3
+      contrast: 0.3
+      saturation: 0.3
+      hue: 0.1
+    random_rotation: 15
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std:  [0.229, 0.224, 0.225]
+  val:
+    resize: [224, 224]
+    normalize:
+      mean: [0.485, 0.456, 0.406]
+      std:  [0.229, 0.224, 0.225]
+
+# ----------------------------------------------------------
+# Model
+# ----------------------------------------------------------
+model:
+  architecture: "deeplabv3plus"
+  backbone: "resnet50"
+  pretrained_backbone: true       # ImageNet weights
+  output_stride: 16               # ASPP dilation rates scale with this
+  aspp_dilations: [6, 12, 18]
+  dropout: 0.1
+
+# ----------------------------------------------------------
+# Training
+# ----------------------------------------------------------
+training:
+  epochs: 5               # quick test on CPU — raise to 50+ when you have a GPU
+  batch_size: 2           # small batch for CPU memory
+  accumulate_grad_batches: 4      # effective batch = 8
+
+  optimizer:
+    name: "adamw"
+    lr: 0.0001
+    weight_decay: 0.01
+    backbone_lr_multiplier: 0.1   # slower LR for pretrained backbone
+
+  scheduler:
+    name: "cosine_with_warmup"
+    warmup_epochs: 1      # reduced — only 5 epochs total
+    min_lr: 1.0e-6
+
+  loss:
+    cross_entropy_weight: 0.5
+    dice_weight: 0.5
+    class_weights: null
+
+  mixed_precision: false  # disabled — no GPU
+  gradient_clip: 1.0
+
+# ----------------------------------------------------------
+# Evaluation
+# ----------------------------------------------------------
+evaluation:
+  batch_size: 2
+  tta_enabled: true
+  tta_flips: ["horizontal"]
+  metrics: ["miou", "per_class_iou", "pixel_accuracy"]
+
+# ----------------------------------------------------------
+# Checkpointing & Logging
+# ----------------------------------------------------------
+output:
+  checkpoint_dir: "outputs/checkpoints"
+  log_dir: "outputs/logs"
+  vis_dir: "outputs/visualizations"
+  save_top_k: 3
+  monitor_metric: "val_miou"
+  log_every_n_steps: 5
+  vis_every_n_epochs: 1
